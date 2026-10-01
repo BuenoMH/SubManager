@@ -69,11 +69,7 @@ public class Assinatura {
 
     public void renovar() {
         verificarExpiracao();
-
-        if (status == Status.PENDENTE || status == Status.CANCELADA) {
-            throw new IllegalStateException(
-                    "Não é possível renovar uma assinatura " + status + ".");
-        }
+        validarRenovacao();
 
         if (status == Status.EXPIRADA) {
             dataInicio = LocalDate.now();
@@ -82,6 +78,15 @@ public class Assinatura {
             dataFinal = dataFinal.plusMonths(plano.getPeriodo());
         }
         status = Status.ATIVA;
+    }
+
+    // Lança exceção se a assinatura não puder ser renovada (PENDENTE ou CANCELADA).
+    // Público para que o AssinaturaService valide ANTES de cobrar o cliente.
+    public void validarRenovacao() {
+        if (status == Status.PENDENTE || status == Status.CANCELADA) {
+            throw new IllegalStateException(
+                    "Não é possível renovar uma assinatura " + status + ".");
+        }
     }
 
     // Se estiver ATIVA e a data final já passou, marca como EXPIRADA.

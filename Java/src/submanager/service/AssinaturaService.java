@@ -5,140 +5,81 @@ import submanager.interfaces.Notificador;
 import submanager.model.Assinatura;
 import submanager.model.Cliente;
 import submanager.model.Cupom;
+import submanager.model.Pagamento;
 import submanager.model.Plano;
 
-// SRP: esta classe faz UMA coisa — coordena o ciclo de vida das assinaturas.
-//      Ela NÃO calcula desconto (delega para CalculadorDesconto),
-//      NÃO processa pagamento (delega para PagamentoService),
-//      NÃO envia notificação (delega para Notificador).
-//
-// DIP: depende das ABSTRAÇÕES (CalculadorDesconto, Notificador, PagamentoService),
-//      nunca das implementações concretas.
-//      As dependências são injetadas pelo construtor.
-//
-// OCP: se surgir um novo tipo de desconto, notificador ou pagamento,
-//      basta criar uma nova implementação — não precisa alterar esta classe.
+import java.util.Objects;
 
+// SRP: coordena o ciclo de vida das assinaturas. Não calcula desconto, não cobra, não envia mensagem.
+// DIP: depende de CalculadoraDesconto, Notificador e PagamentoService, injetados pelo construtor.
+// OCP: novo desconto/canal/meio de pagamento = nova implementação; esta classe não muda.
 public class AssinaturaService {
 
     private final PagamentoService pagamentoService;
     private final Notificador notificador;
-    private final CalculadorDesconto desconto;
+    private final CalculadorDesconto calculadoraDesconto;
 
-    // Contador simples para gerar IDs de assinatura (em memória)
+    // Contador simples para IDs (em memória)
     private int proximoId = 1;
 
-    // Injeção de dependências via construtor (DIP)
-    public AssinaturaService(PagamentoService pagamentoService, Notificador notificador, CalculadorDesconto desconto) {
-        this.pagamentoService = pagamentoService;
-        this.notificador = notificador;
-        this.desconto = desconto;
+    public AssinaturaService(PagamentoService pagamentoService,
+                             Notificador notificador,
+                             CalculadorDesconto calculadoraDesconto) {
+        this.pagamentoService = Objects.requireNonNull(pagamentoService, "pagamentoService é obrigatório");
+        this.notificador = Objects.requireNonNull(notificador, "notificador é obrigatório");
+        this.calculadoraDesconto = Objects.requireNonNull(calculadoraDesconto, "calculadoraDesconto é obrigatória");
     }
 
-    // =========================================================================
-    // criarAssinatura — fluxo completo: desconto → pagamento → ativação → notificação
-    // =========================================================================
+    // desconto -> valor final -> pagamento -> ativação -> notificação.
+    // Se o pagamento for recusado, devolve a assinatura ainda PENDENTE.
     public Assinatura criarAssinatura(Cliente cliente, Plano plano, Cupom cupom) {
-        System.out.println("\n>> Iniciando criação de assinatura...");
-        System.out.println("   Cliente: " + cliente.getNome());
-        System.out.println("   Plano: " + plano.getNome() + " — R$ " + String.format("%.2f", plano.getValor()));
+        Assinatura assinatura = new Assinatura(proximoId++, cliente, plano); // valida cliente/plano; nasce PENDENTE
 
-        // 1. Calcula o valor com desconto (delega para CalculadorDesconto — DIP)
         double valorOriginal = plano.getValor();
-        double valorFinal = desconto.calcularDesconto(valorOriginal, cupom);
+        double valorFinal = valorOriginal - calculadoraDesconto.calcularDesconto(valorOriginal, cupom);
 
-        System.out.println("   Tipo de desconto: " + desconto.getDescricao());
-        System.out.println("   Valor original: R$ " + String.format("%.2f", valorOriginal));
-        System.out.println("   Valor final: R$ " + String.format("%.2f", valorFinal));
-
-        // 2. Cria a assinatura (nasce PENDENTE)
-        Assinatura assinatura = new Assinatura(proximoId++, cliente, plano);
-
-        // 3. Processa o pagamento (delega para PagamentoService — DIP)
-        if (pagamentoService != null) {
-            boolean pagamentoAprovado = pagamentoService.processarPagamento(assinatura, valorFinal);
-
-            if (!pagamentoAprovado) {
-                System.out.println("   ✗ Pagamento recusado. Assinatura não foi ativada.");
-                return assinatura; // retorna com status PENDENTE
-            }
+        Pagamento pagamento = pagamentoService.processarPagamento(assinatura, valorFinal);
+        if (!pagamento.isAprovado()) {
+            return assinatura;
         }
 
-        // 4. Ativa a assinatura após pagamento aprovado
         assinatura.ativar();
-        System.out.println("   ✓ Assinatura ativada: " + assinatura);
-
-        // 5. Envia notificação (delega para Notificador — DIP)
         notificador.enviar(
-                "Olá " + cliente.getNome() + "! Sua assinatura do plano "
-                        + plano.getNome() + " foi criada com sucesso. Valor: R$ "
-                        + String.format("%.2f", valorFinal),
-                cliente.getEmail(),
-                "Assinatura criada"
-        );
+                String.format("Olá %s! Sua assinatura do plano %s foi criada com sucesso. Valor: R$ %.2f",
+                        cliente.getNome(), plano.getNome(), valorFinal),
+                cliente);
 
         return assinatura;
     }
 
-    // Sobrecarga: criar assinatura sem cupom
     public Assinatura criarAssinatura(Cliente cliente, Plano plano) {
         return criarAssinatura(cliente, plano, null);
     }
 
-    // =========================================================================
-    // renovarAssinatura — renova por mais um período do plano
-    // =========================================================================
-    public void renovarAssinatura(Assinatura assinatura) {
-        System.out.println("\n>> Iniciando renovação de assinatura...");
-        System.out.println("   Assinatura: " + assinatura);
+    // Renova por mais um período. Retorna false se o pagamento foi recusado.
+    // Valida ANTES de cobrar: uma assinatura cancelada/pendente nunca gera cobrança.
+    public boolean renovarAssinatura(Assinatura assinatura) {
+        assinatura.validarRenovacao();
 
-        // 1. Calcula o valor da renovação (pode ter desconto de fidelidade no futuro — OCP)
-        double valorRenovacao = assinatura.getPlano().getValor();
-
-        // 2. Processa o pagamento da renovação
-        if (pagamentoService != null) {
-            boolean pagamentoAprovado = pagamentoService.processarPagamento(assinatura, valorRenovacao);
-
-            if (!pagamentoAprovado) {
-                System.out.println("   ✗ Pagamento da renovação recusado.");
-                return;
-            }
+        Pagamento pagamento = pagamentoService.processarPagamento(assinatura, assinatura.getPlano().getValor());
+        if (!pagamento.isAprovado()) {
+            return false;
         }
 
-        // 3. Renova a assinatura (delega para o próprio model Assinatura)
         assinatura.renovar();
-        System.out.println("   ✓ Assinatura renovada: " + assinatura);
-
-        // 4. Notifica o cliente
-        Cliente cliente = assinatura.getCliente();
         notificador.enviar(
-                "Olá " + cliente.getNome() + "! Sua assinatura do plano "
-                        + assinatura.getPlano().getNome() + " foi renovada com sucesso. "
-                        + "Nova data de vencimento: " + assinatura.getDataFinal(),
-                cliente.getEmail(),
-                "Assinatura renovada"
-        );
+                String.format("Olá %s! Sua assinatura do plano %s foi renovada. Novo vencimento: %s",
+                        assinatura.getCliente().getNome(), assinatura.getPlano().getNome(), assinatura.getDataFinal()),
+                assinatura.getCliente());
+
+        return true;
     }
 
-    // =========================================================================
-    // cancelarAssinatura — cancela e notifica o cliente
-    // =========================================================================
     public void cancelarAssinatura(Assinatura assinatura) {
-        System.out.println("\n>> Iniciando cancelamento de assinatura...");
-        System.out.println("   Assinatura: " + assinatura);
-
-        // 1. Cancela a assinatura (delega para o próprio model Assinatura)
         assinatura.cancelar();
-        System.out.println("   ✓ Assinatura cancelada: " + assinatura);
-
-        // 2. Notifica o cliente
-        Cliente cliente = assinatura.getCliente();
         notificador.enviar(
-                "Olá " + cliente.getNome() + ". Sua assinatura do plano "
-                        + assinatura.getPlano().getNome() + " foi cancelada. "
-                        + "Esperamos vê-lo de volta em breve!",
-                cliente.getEmail(),
-                "Assinatura cancelada"
-        );
+                String.format("Olá %s. Sua assinatura do plano %s foi cancelada. Esperamos vê-lo de volta em breve!",
+                        assinatura.getCliente().getNome(), assinatura.getPlano().getNome()),
+                assinatura.getCliente());
     }
 }

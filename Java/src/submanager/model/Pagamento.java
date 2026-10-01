@@ -83,6 +83,10 @@ public class Pagamento {
         return status;
     }
 
+    public boolean isAprovado() {
+        return status == Status.APROVADO;
+    }
+
     // Retorna null enquanto o pagamento não for aprovado.
     public LocalDateTime getDataPagamento() {
         return dataPagamento;

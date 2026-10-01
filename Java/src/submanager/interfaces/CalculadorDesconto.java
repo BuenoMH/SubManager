@@ -2,14 +2,10 @@ package submanager.interfaces;
 
 import submanager.model.Cupom;
 
-// ISP: interface pequena e focada — só define o contrato para cálculo de desconto.
-// DIP: os Services dependem desta abstração, não das implementações concretas.
-
+// ISP: contrato mínimo para cálculo de desconto.
 public interface CalculadorDesconto {
 
-    // Recebe o valor original e um cupom (pode ser null) e retorna o valor com desconto aplicado.
+    // Retorna o VALOR DO DESCONTO em reais (0 se não houver), nunca o preço final.
+    // O cupom pode ser null; cada implementação decide se o utiliza.
     double calcularDesconto(double valor, Cupom cupom);
-
-    // Retorna uma descrição do tipo de desconto aplicado.
-    String getDescricao();
 }

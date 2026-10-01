@@ -1,13 +1,11 @@
 package submanager.interfaces;
 
-// ISP: interface pequena e específica — só define o contrato de notificação.
-// TODO: Integrante 2 — esta interface foi definida para integração.
+import submanager.model.Cliente;
 
+// ISP: contrato mínimo de notificação.
+// Recebe o Cliente (e não uma String) porque cada canal usa um contato diferente: e-mail usa getEmail(), WhatsApp usa getTelefone(). Assim os services nunca
+// precisam saber qual canal está por trás da interface (LSP/DIP).
 public interface Notificador {
 
-    // Envia uma notificação para o destinatário.
-    void enviar(String mensagem, String destinatario, String assunto);
-
-    // Retorna o canal de notificação (ex.: "Email", "WhatsApp").
-    String getCanal();
+    void enviar(String mensagem, Cliente destinatario);
 }

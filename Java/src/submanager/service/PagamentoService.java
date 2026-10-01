@@ -3,34 +3,42 @@ package submanager.service;
 import submanager.interfaces.MetodoPagamento;
 import submanager.interfaces.Notificador;
 import submanager.model.Assinatura;
+import submanager.model.Pagamento;
 
-// TODO: Integrante 2 — implementar a lógica completa de processamento de pagamento.
-// O método processarPagamento foi definido para integração com o AssinaturaService.
+import java.util.Objects;
 
+// SRP: coordena UM processo — cobrar, registrar o resultado e avisar o cliente.
+// DIP: conhece apenas MetodoPagamento e Notificador (abstrações), recebidos pelo construtor.
+// OCP: novo meio de pagamento = nova implementação de MetodoPagamento; esta classe não muda.
 public class PagamentoService {
 
-    private MetodoPagamento metodoPagamento;
-    private Notificador notificador;
+    private final MetodoPagamento metodoPagamento;
+    private final Notificador notificador;
+
+    // Contador simples para IDs (em memória)
+    private int proximoId = 1;
 
     public PagamentoService(MetodoPagamento metodoPagamento, Notificador notificador) {
-        this.metodoPagamento = metodoPagamento;
-        this.notificador = notificador;
+        this.metodoPagamento = Objects.requireNonNull(metodoPagamento, "metodoPagamento é obrigatório");
+        this.notificador = Objects.requireNonNull(notificador, "notificador é obrigatório");
     }
 
-    // Processa o pagamento de uma assinatura e retorna true se aprovado.
-    // TODO: Integrante 2 — substituir pela lógica real de cobrança.
-    public boolean processarPagamento(Assinatura assinatura, double valor) {
-        System.out.println("  [PagamentoService] Processando pagamento de R$ " + String.format("%.2f", valor) + "...");
+    // Cobra o valor e devolve o Pagamento já finalizado (APROVADO ou RECUSADO).
+    public Pagamento processarPagamento(Assinatura assinatura, double valor) {
+        Pagamento pagamento = new Pagamento(proximoId++, assinatura, metodoPagamento, valor);
 
-        // Delega para o método de pagamento (Pix, Cartão, Boleto)
-        boolean aprovado = metodoPagamento.pagar(valor);
-
-        if (aprovado) {
-            System.out.println("  [PagamentoService] Pagamento aprovado.");
+        if (metodoPagamento.pagar(valor)) {
+            pagamento.aprovar();
+            notificador.enviar(
+                    String.format("Pagamento de R$ %.2f aprovado via %s.", valor, metodoPagamento.getDescricao()),
+                    assinatura.getCliente());
         } else {
-            System.out.println("  [PagamentoService] Pagamento recusado.");
+            pagamento.recusar();
+            notificador.enviar(
+                    String.format("Falha ao processar seu pagamento de R$ %.2f via %s.", valor, metodoPagamento.getDescricao()),
+                    assinatura.getCliente());
         }
 
-        return aprovado;
+        return pagamento;
     }
 }

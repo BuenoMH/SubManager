@@ -2,34 +2,102 @@
 
 Sistema de gerenciamento de assinaturas desenvolvido em **Java**, com foco na aplicação prática dos princípios **SOLID**.
 
-O projeto simula uma plataforma onde clientes podem contratar planos, realizar pagamentos, utilizar descontos, receber notificações e gerenciar suas assinaturas.
-
-A aplicação inicialmente será executada pelo **terminal da IDE IntelliJ IDEA**, utilizando `Scanner` para interação com o usuário.
+O programa simula uma plataforma em que um cliente contrata um plano, escolhe como ser notificado, aplica um desconto (ou não) e paga por Pix, cartão ou boleto. Tudo roda pelo **terminal**, usando `Scanner`, e os dados ficam apenas **em memória** (sem banco de dados e sem frameworks externos).
 
 ---
 
-## 🎯 Objetivo do projeto
+## Sumário
 
-O principal objetivo do SubManager é demonstrar, na prática, a aplicação dos princípios:
-
-* **S — Single Responsibility Principle**
-* **O — Open/Closed Principle**
-* **L — Liskov Substitution Principle**
-* **I — Interface Segregation Principle**
-* **D — Dependency Inversion Principle**
-
-A aplicação será dividida em entidades, interfaces, implementações e serviços, mantendo as responsabilidades separadas.
-
-Um dos principais objetivos da arquitetura é permitir adicionar novos comportamentos sem precisar modificar os serviços principais.
+1. [Como executar](#-como-executar)
+2. [Funcionamento do programa](#-funcionamento-do-programa)
+3. [Arquitetura](#-arquitetura)
+4. [Fluxo de execução](#-fluxo-de-execução)
+5. [Camadas e responsabilidades](#-camadas-e-responsabilidades)
+6. [SOLID no projeto](#-solid-no-projeto)
+7. [Como estender o sistema](#-como-estender-o-sistema)
+8. [Decisões de projeto e limitações](#-decisões-de-projeto-e-limitações)
+9. [Equipe](#-equipe)
 
 ---
 
-# 🏗️ Arquitetura
+##  Como executar
+
+**Requisitos:** JDK 17 ou superior (o `Main` usa `switch` com seta e `switch` como expressão) e, de preferência, o IntelliJ IDEA.
+
+**Pelo IntelliJ**
+
+1. Abra a pasta do projeto.
+2. Marque `Java/src` como *Sources Root*.
+3. Execute a classe `Main` (ela não tem `package`, fica direto em `src/`).
+
+**Pelo terminal**
+
+```bash
+cd Java/src
+javac -d out $(find . -name "*.java")
+java -cp out Main
+```
+
+---
+
+##  Funcionamento do programa
+
+Ao iniciar, o programa mostra o menu principal:
+
+```text
+========================================
+       SUBMANAGER - MENU PRINCIPAL
+========================================
+  [1] Simular Nova Assinatura
+  [0] Sair
+========================================
+Escolha uma opção:
+```
+
+Ao escolher `[1]`, o usuário passa por cinco etapas:
+
+| Etapa | O que é pedido | Opções |
+| ----- | -------------- | ------ |
+| 1. Dados do cliente | Nome, e-mail, CPF e telefone | Texto livre (validado pelo modelo `Cliente`) |
+| 2. Plano | Plano a contratar | `[1]` Básico (R$ 29,90) · `[2]` Premium (R$ 59,90) |
+| 3. Notificação | Canal de aviso ao cliente | `[1]` E-mail · `[2]` WhatsApp |
+| 4. Desconto | Tipo de desconto | `[1]` Cliente Novo (15%) · `[2]` Cupom Promocional (10%) · `[3]` Nenhum |
+| 5. Pagamento | Forma de pagamento | `[1]` Pix · `[2]` Cartão de Crédito · `[3]` Boleto |
+
+Depois disso, o programa processa a assinatura e exibe o resumo:
+
+```text
+========================================
+          RESUMO DA ASSINATURA
+========================================
+Processando assinatura e pagamento...
+
+Gerando QR Code e processando Pix no valor de R$ 53,91
+Enviando WhatsApp para 11999999999 | Mensagem: Pagamento de R$ 53,91 aprovado via Pix.
+Enviando WhatsApp para 11999999999 | Mensagem: Olá Maria! Sua assinatura do plano Premium foi criada com sucesso. Valor: R$ 53,91
+
+[SUCESSO] Sua assinatura foi ativada com sucesso!
+Assinatura #1 | Maria | Plano Premium | 01/10/2026 a 01/11/2026 | ATIVA
+========================================
+```
+
+*(Exemplo: plano Premium, cupom promocional de 10%, Pix e WhatsApp.)*
+
+### Tratamento de erros
+
+* **Dados inválidos** (nome vazio, e-mail sem `@`, CPF ou telefone em branco): o modelo `Cliente` lança `IllegalArgumentException`, e a `Main` mostra `[ERRO]` com a mensagem e volta ao menu.
+* **Opção inválida** no menu principal: mostra `[!] Opção inválida`.
+* **Opção inválida nos submenus**: cai na opção padrão (Plano Básico, E-mail, Sem desconto, Pix).
+* **Pagamento recusado**: a assinatura permanece `PENDENTE` e a `Main` mostra `[ERRO] Falha no pagamento`.
+
+---
+
+##  Arquitetura
 
 ```text
 src/
-└── br.com.submanager/
-    │
+├── Main.java
+└── submanager/
     ├── model/
     │   ├── Cliente.java
     │   ├── Plano.java
@@ -40,1056 +108,301 @@ src/
     ├── interfaces/
     │   ├── MetodoPagamento.java
     │   ├── Notificador.java
-    │   └── CalculadoraDesconto.java
+    │   └── CalculadorDesconto.java
     │
     ├── implementations/
     │   ├── pagamento/
     │   │   ├── PixPagamento.java
     │   │   ├── CartaoPagamento.java
     │   │   └── BoletoPagamento.java
-    │   │
     │   ├── notificacao/
     │   │   ├── EmailNotificador.java
-    │   │   └── WhatsAppNotificador.java
-    │   │
+    │   │   └── WhatsappNotificador.java
     │   └── desconto/
     │       ├── DescontoCupom.java
     │       └── DescontoClienteNovo.java
     │
-    ├── service/
-    │   ├── AssinaturaService.java
-    │   └── PagamentoService.java
+    └── service/
+        ├── AssinaturaService.java
+        └── PagamentoService.java
+```
+
+### Diagrama de dependências
+
+```text
+                         ┌──────────┐
+                         │   Main   │  (interação + composição)
+                         └────┬─────┘
+                              │ cria e injeta
+                              ▼
+                    ┌───────────────────┐
+                    │ AssinaturaService │
+                    └─────────┬─────────┘
+          ┌───────────────────┼────────────────────┐
+          ▼                   ▼                    ▼
+  «interface»          «interface»          ┌────────────────┐
+  CalculadorDesconto    Notificador         │PagamentoService│
+          ▲                   ▲             └───────┬────────┘
+          │                   │                     │
+  ┌───────┴────────┐   ┌──────┴───────┐     ┌───────┴────────┐
+  │ DescontoCupom  │   │ Email        │     ▼                ▼
+  │ DescontoCliente│   │ Whatsapp     │  «interface»     «interface»
+  │ Novo           │   └──────────────┘  MetodoPagamento  Notificador
+  └────────────────┘                          ▲
+                                     ┌────────┼────────┐
+                                     │        │        │
+                                    Pix    Cartão   Boleto
+```
+
+Os *services* dependem **somente de interfaces**. As classes concretas só aparecem na `Main`, que monta o conjunto.
+
+---
+
+##  Fluxo de execução
+
+```text
+Usuário
+   │  informa dados, plano, notificação, desconto e pagamento
+   ▼
+Main
+   │  1. valida o Cliente (via construtor do modelo)
+   │  2. escolhe as implementações (Notificador, CalculadorDesconto, MetodoPagamento)
+   │  3. cria PagamentoService(metodoPagamento, notificador)
+   │  4. cria AssinaturaService(pagamentoService, notificador, calculadorDesconto)
+   │  5. chama assinaturaService.criarAssinatura(cliente, plano, cupom)
+   ▼
+AssinaturaService.criarAssinatura()
+   │  a. cria Assinatura (nasce PENDENTE)
+   │  b. calcularDesconto(valor, cupom) → valor final = valor - desconto
+   │  c. pagamentoService.processarPagamento(assinatura, valorFinal)
+   ▼
+PagamentoService.processarPagamento()
+   │  a. cria Pagamento (nasce PENDENTE)
+   │  b. metodoPagamento.pagar(valor)
+   │  c. aprova ou recusa o Pagamento
+   │  d. notifica o cliente sobre o resultado do pagamento
+   ▼
+De volta ao AssinaturaService
+   │  • aprovado → assinatura.ativar() (PENDENTE → ATIVA) + notifica o cliente
+   │  • recusado → devolve a assinatura ainda PENDENTE
+   ▼
+Main
+      mostra [SUCESSO] ou [ERRO] e o resumo da assinatura
+```
+
+### Ciclo de vida da `Assinatura`
+
+```text
+            ativar()                    renovar()
+ PENDENTE ───────────▶ ATIVA ◀───────────────────── EXPIRADA
+                         │                              ▲
+                         │  verificarExpiracao()        │
+                         └──────────────────────────────┘
+                         │
+                         │  cancelar()
+                         ▼
+                    CANCELADA   (não pode ser renovada)
+```
+
+### Ciclo de vida do `Pagamento`
+
+```text
+ PENDENTE ──aprovar()──▶ APROVADO
     │
-    └── Main.java
+    └────recusar()─────▶ RECUSADO
 ```
+
+Depois de finalizado (aprovado ou recusado), o pagamento não muda mais de estado.
 
 ---
 
-# 🧩 Funcionamento do sistema
+##  Camadas e responsabilidades
 
-O fluxo principal do sistema será:
+### `model` — domínio
 
-```text
-Cliente
-   │
-   ▼
-Escolhe um Plano
-   │
-   ▼
-Calcula desconto
-   │
-   ▼
-Calcula valor final
-   │
-   ▼
-PagamentoService
-   │
-   ▼
-MetodoPagamento
-   │
-   ├── Pix
-   ├── Cartão
-   └── Boleto
-   │
-   ▼
-Pagamento aprovado
-   │
-   ▼
-Cria Assinatura
-   │
-   ▼
-Notificador
-   │
-   ├── E-mail
-   └── WhatsApp
-```
+Entidades que guardam dados e protegem as próprias regras (validações no construtor, transições de estado).
 
-O `Main.java` será responsável pela interação com o usuário.
+| Classe | Papel |
+| ------ | ----- |
+| `Cliente` | Dados do cliente: `id`, `nome`, `email`, `cpf`, `telefone`. Valida os campos obrigatórios. |
+| `Plano` | Plano contratável: `id`, `nome`, `descricao`, `valor`, `periodo` (em meses). |
+| `Assinatura` | Contratação de um plano. Controla o próprio ciclo de vida: `ativar()`, `renovar()`, `cancelar()`, `verificarExpiracao()`. |
+| `Pagamento` | Registro de uma cobrança: `aprovar()` e `recusar()`. Não processa pagamento, só guarda o resultado. |
+| `Cupom` | Dados de um cupom: `codigo`, `tipo`, `percentual`, `validade`. Informa se está válido. |
 
-As regras de negócio deverão ficar nos **Services** e nas classes responsáveis por cada comportamento.
+### `interfaces` — contratos
+
+| Interface | Contrato |
+| --------- | -------- |
+| `MetodoPagamento` | `boolean pagar(double valor)` e `String getDescricao()` |
+| `Notificador` | `void enviar(String mensagem, Cliente destinatario)` |
+| `CalculadorDesconto` | `double calcularDesconto(double valor, Cupom cupom)`: retorna o **valor do desconto**, nunca o preço final |
+
+### `implementations` — comportamentos concretos
+
+| Pacote | Classes | Comportamento |
+| ------ | ------- | ------------- |
+| `pagamento` | `PixPagamento`, `CartaoPagamento`, `BoletoPagamento` | Simulam a cobrança e sempre aprovam. |
+| `notificacao` | `EmailNotificador`, `WhatsappNotificador` | E-mail usa `getEmail()`, WhatsApp usa `getTelefone()`. |
+| `desconto` | `DescontoClienteNovo`, `DescontoCupom` | 15% fixo (ignora o cupom) / percentual do cupom (zero se `null` ou vencido). |
+
+### `service` — orquestração
+
+| Service | Responsabilidade |
+| ------- | ---------------- |
+| `PagamentoService` | Coordena **uma** cobrança: cria o `Pagamento`, chama o `MetodoPagamento`, registra o resultado e notifica. |
+| `AssinaturaService` | Coordena o ciclo de vida: `criarAssinatura()`, `renovarAssinatura()`, `cancelarAssinatura()`. |
+
+### `Main` — terminal
+
+Cuida **apenas** de ler e exibir dados e de montar as dependências. Não calcula desconto, não cobra, não ativa assinatura e não envia mensagem.
 
 ---
 
-# 📦 Entidades
+## SOLID no projeto
 
-## Cliente
+### S — Single Responsibility Principle
 
-Representa o usuário que possui uma assinatura.
+> Cada classe tem um único motivo para mudar.
 
-Principais atributos:
+| Classe | Única responsabilidade |
+| ------ | ---------------------- |
+| `PixPagamento` | Cobrar via Pix |
+| `EmailNotificador` | Enviar notificação por e-mail |
+| `DescontoCupom` | Calcular desconto de cupom |
+| `Assinatura` | Controlar o estado da assinatura |
+| `Pagamento` | Registrar o resultado de uma cobrança |
+| `PagamentoService` | Coordenar o processo de pagamento |
+| `AssinaturaService` | Coordenar o ciclo de vida da assinatura |
+| `Main` | Interagir com o usuário |
 
-```text
-id
-nome
-email
-cpf
-telefone
-```
+O `AssinaturaService` **não** calcula desconto, não cobra e não envia mensagem: ele delega cada uma dessas tarefas. A `Main` também não: ela só delega ao service.
 
----
+### O — Open/Closed Principle
 
-## Plano
+> Aberto para extensão, fechado para modificação.
 
-Representa um plano disponível para contratação.
-
-Principais atributos:
-
-```text
-id
-nome
-descricao
-valor
-periodo
-```
-
-Exemplos:
-
-* Básico
-* Premium
-* Empresarial
-
----
-
-## Assinatura
-
-Representa a contratação de um plano por um cliente.
-
-Principais atributos:
-
-```text
-id
-cliente
-plano
-dataInicio
-dataFinal
-status
-```
-
-Possíveis status:
-
-```text
-ATIVA
-PENDENTE
-CANCELADA
-EXPIRADA
-```
-
----
-
-## Pagamento
-
-Representa um pagamento relacionado a uma assinatura.
-
-Principais atributos:
-
-```text
-id
-assinatura
-metodo
-valor
-status
-dataPagamento
-```
-
----
-
-## Cupom
-
-Representa um desconto que pode ser aplicado à assinatura.
-
-Exemplo:
-
-```text
-Código: PRIMEIRA10
-Percentual: 10%
-```
-
----
-
-# 🔌 Interfaces
-
-## MetodoPagamento
-
-Define o comportamento que qualquer método de pagamento deve possuir.
-
-```java
-public interface MetodoPagamento {
-
-    boolean pagar(double valor);
-
-    String getDescricao();
-}
-```
-
-Implementações:
-
-```text
-PixPagamento
-CartaoPagamento
-BoletoPagamento
-```
-
----
-
-## Notificador
-
-Define o comportamento responsável pelo envio de notificações.
-
-```java
-public interface Notificador {
-
-    void enviar(String mensagem, String destinatario);
-}
-```
-
-Implementações:
-
-```text
-EmailNotificador
-WhatsAppNotificador
-```
-
----
-
-## CalculadoraDesconto
-
-Define o comportamento responsável pelo cálculo de descontos.
-
-```java
-public interface CalculadoraDesconto {
-
-    double calcularDesconto(double valor, Cupom cupom);
-}
-```
-
-Implementações:
-
-```text
-DescontoCupom
-DescontoClienteNovo
-```
-
----
-
-# ⚙️ Services
-
-## PagamentoService
-
-Responsável por coordenar o processamento de pagamentos.
-
-Recebe suas dependências através do construtor:
-
-```java
-public PagamentoService(
-        MetodoPagamento metodoPagamento,
-        Notificador notificador
-) {
-    this.metodoPagamento = metodoPagamento;
-    this.notificador = notificador;
-}
-```
-
-O serviço deverá:
-
-1. Receber o valor;
-2. Utilizar o método de pagamento;
-3. Verificar se o pagamento foi aprovado;
-4. Enviar uma notificação.
-
-Fluxo:
-
-```text
-PagamentoService
-       │
-       ├── MetodoPagamento
-       │       └── PixPagamento
-       │
-       └── Notificador
-               └── WhatsAppNotificador
-```
-
----
-
-## AssinaturaService
-
-Responsável por coordenar o ciclo de vida das assinaturas.
-
-Principais operações:
-
-```text
-criarAssinatura()
-renovarAssinatura()
-cancelarAssinatura()
-```
-
-O serviço deverá coordenar:
-
-```text
-Cliente
-Plano
-CalculadoraDesconto
-PagamentoService
-Notificador
-```
-
-O `AssinaturaService` não deverá implementar diretamente regras específicas de Pix, cartão, boleto, e-mail etc.
-
----
-
-# 🧠 Aplicação dos princípios SOLID
-
-## S — Single Responsibility
-
-Cada classe deve possuir uma responsabilidade específica.
-
-Exemplo:
-
-```text
-PixPagamento
-    → responsável pelo pagamento via Pix
-
-EmailNotificador
-    → responsável pelo envio de notificações por e-mail
-
-PagamentoService
-    → responsável por coordenar o processo de pagamento
-```
-
----
-
-## O — Open/Closed
-
-O sistema deve estar aberto para extensão e fechado para modificação.
-
-Por exemplo, para adicionar um novo método:
-
-```text
-CriptoPagamento
-```
-
-não devemos precisar alterar o `PagamentoService`.
-
-Basta criar:
+Para adicionar um novo meio de pagamento, basta criar uma nova classe:
 
 ```java
 public class CriptoPagamento implements MetodoPagamento {
 
-    // implementação
+    @Override
+    public boolean pagar(double valor) {
+        // ...
+        return true;
+    }
+
+    @Override
+    public String getDescricao() {
+        return "Criptomoeda";
+    }
 }
 ```
 
-Dessa forma, novos comportamentos podem ser adicionados utilizando as abstrações existentes.
+`PagamentoService` e `AssinaturaService` **não mudam**. O mesmo vale para novos notificadores (SMS, push) e novos descontos (fidelidade, aniversário). A única alteração fica no ponto de composição (`Main`), que passa a oferecer a nova opção no menu.
+
+### L — Liskov Substitution Principle
+
+> Qualquer implementação pode substituir sua interface sem quebrar o código que a usa.
+
+```java
+MetodoPagamento metodo = new PixPagamento();     // ou
+MetodoPagamento metodo = new CartaoPagamento();  // ou
+MetodoPagamento metodo = new BoletoPagamento();
+```
+
+O `PagamentoService` chama `pagar()` e `getDescricao()` sem saber qual implementação recebeu, e todas respeitam o contrato (retornam `true` se aprovado). O mesmo vale para `Notificador` e `CalculadorDesconto`:
+
+* A interface `Notificador` recebe o **`Cliente`** (e não uma `String`), porque cada canal usa um contato diferente. Assim nenhuma implementação precisa de tratamento especial.
+* `CalculadorDesconto` define que o retorno é sempre o *valor do desconto*. `DescontoClienteNovo` ignora o cupom e `DescontoCupom` aceita `null`, e ambas respeitam o contrato sem surpresas.
+
+### I — Interface Segregation Principle
+
+> Interfaces pequenas e específicas.
+
+Em vez de uma interface gigante com `pagar()`, `enviarEmail()` e `calcularDesconto()`, existem três contratos mínimos:
+
+```text
+MetodoPagamento     →  pagar(), getDescricao()
+Notificador         →  enviar()
+CalculadorDesconto  →  calcularDesconto()
+```
+
+Nenhuma classe é obrigada a implementar métodos que não usa. Como `CalculadorDesconto` tem um único método, ele também aceita **lambda** (usado na `Main` para o caso "sem desconto").
+
+### D — Dependency Inversion Principle
+
+> Depender de abstrações, não de implementações.
+
+Os services recebem as dependências pelo construtor, sempre como interfaces:
+
+```java
+public PagamentoService(MetodoPagamento metodoPagamento, Notificador notificador) { ... }
+
+public AssinaturaService(PagamentoService pagamentoService,
+                         Notificador notificador,
+                         CalculadorDesconto calculadoraDesconto) { ... }
+```
+
+As implementações concretas são escolhidas e injetadas pela `Main` (a "raiz de composição"):
+
+```java
+PagamentoService pagamentoService = new PagamentoService(metodoPagamento, notificador);
+AssinaturaService assinaturaService = new AssinaturaService(pagamentoService, notificador, calculadorDesconto);
+```
+
+Nenhum service importa `PixPagamento`, `EmailNotificador` ou qualquer outra classe concreta.
+
+### Resumo
+
+| Princípio | Onde aparece |
+| --------- | ------------ |
+| **S** | Classes pequenas e focadas; services só coordenam; `Main` só faz interface com o usuário |
+| **O** | Novo pagamento, canal ou desconto = nova classe, sem alterar os services |
+| **L** | Pix, Cartão e Boleto (e os demais pares) são intercambiáveis |
+| **I** | Três interfaces mínimas, uma por responsabilidade |
+| **D** | Injeção por construtor de interfaces nos services |
+
+### O que o projeto evita de propósito
+
+* Cadeias de `if (tipoPagamento.equals("PIX")) ... else if ...` dentro dos services para decidir o comportamento.
+* Uso de `instanceof` para controlar regras de negócio.
+* Regras de negócio dentro da `Main`.
+
+A escolha do comportamento é feita por **polimorfismo**: o código chama a interface e a implementação correta executa.
 
 ---
 
-## L — Liskov Substitution
+## ➕ Como estender o sistema
 
-As implementações de `MetodoPagamento` devem poder substituir umas às outras.
+| Quero adicionar... | O que criar | O que alterar |
+| ------------------ | ----------- | ------------- |
+| Novo meio de pagamento | Classe que implementa `MetodoPagamento` | Opção no menu e no `selecionarMetodoPagamento` da `Main` |
+| Novo canal de notificação | Classe que implementa `Notificador` | Opção no menu e no `selecionarNotificador` da `Main` |
+| Novo tipo de desconto | Classe que implementa `CalculadorDesconto` | Opção no menu e no `selecionarDesconto` da `Main` |
+| Novo plano | Nada (usa o modelo `Plano`) | Opção no menu e no `selecionarPlano` da `Main` |
 
-Por exemplo:
-
-```java
-MetodoPagamento pagamento;
-```
-
-pode receber:
-
-```java
-new PixPagamento();
-```
-
-ou:
-
-```java
-new CartaoPagamento();
-```
-
-ou:
-
-```java
-new BoletoPagamento();
-```
-
-O código que utiliza a interface não precisa conhecer a implementação específica.
+Os services (`PagamentoService` e `AssinaturaService`) permanecem intactos em todos os casos.
 
 ---
 
-## I — Interface Segregation
+##  Decisões de projeto e limitações
 
-As interfaces devem ser pequenas e específicas.
-
-Em vez de criar uma interface gigante contendo:
-
-```text
-pagar()
-enviarEmail()
-calcularDesconto()
-cancelarAssinatura()
-```
-
-cada responsabilidade possui sua própria abstração:
-
-```text
-MetodoPagamento
-Notificador
-CalculadoraDesconto
-```
+* **Services montados a cada fluxo.** O `PagamentoService` recebe um único `MetodoPagamento` no construtor, então a `Main` cria os services depois que o usuário escolhe pagamento, notificação e desconto.
+* **Pagamentos simulados.** Pix, cartão e boleto apenas imprimem uma mensagem e retornam `true`, então hoje o fluxo de recusa só pode ser exercitado com uma nova implementação de teste.
+* **Dois avisos por fluxo.** O `PagamentoService` notifica o resultado da cobrança e o `AssinaturaService` notifica a criação da assinatura, por isso o cliente recebe duas mensagens.
+* **Cupom é percentual.** O modelo `Cupom` guarda um percentual (10.0 = 10%), e não um valor em reais. O cupom promocional do menu (`PROMO10`, 10%, válido por 30 dias) é criado na `Main`.
+* **Dados em memória.** IDs são gerados por contadores simples e nada é persistido entre execuções.
+* **Operações ainda não expostas no menu.** `renovarAssinatura()` e `cancelarAssinatura()` já existem no `AssinaturaService`, mas o menu atual cobre apenas a simulação de nova assinatura.
 
 ---
 
-## D — Dependency Inversion
-
-Os serviços devem depender de abstrações e não diretamente das implementações.
-
-Exemplo:
-
-```java
-private MetodoPagamento metodoPagamento;
-```
-
-em vez de:
-
-```java
-private PixPagamento pixPagamento;
-```
-
-As dependências serão recebidas através do construtor.
-
-Isso permite trocar facilmente uma implementação por outra.
-
----
-
-# 👥 Divisão do projeto entre 4 integrantes
-
-A divisão foi feita para que cada integrante tenha arquivos próprios, mas que as partes tenham dependências claras entre si.
-
----
-
-# 👤 Integrante 1 — Modelagem do domínio
-
-## Responsabilidade
-
-Criar as entidades principais do sistema.
-
-## Arquivos
-
-```text
-model/
-├── Cliente.java
-├── Plano.java
-└── Assinatura.java
-```
-
-## Cliente.java
-
-Funções principais:
-
-```java
-getId()
-getNome()
-getEmail()
-getCpf()
-getTelefone()
-```
-
-## Plano.java
-
-Funções principais:
-
-```java
-getId()
-getNome()
-getDescricao()
-getValor()
-getPeriodo()
-```
-
-## Assinatura.java
-
-Funções principais:
-
-```java
-getId()
-getCliente()
-getPlano()
-getDataInicio()
-getDataFinal()
-getStatus()
-
-ativar()
-cancelar()
-renovar()
-```
-
-## Conexão
-
-O trabalho do Integrante 1 será utilizado principalmente por:
-
-```text
-Integrante 2 → Pagamentos
-Integrante 3 → Assinaturas e descontos
-Integrante 4 → Terminal/Main
-```
-
-Fluxo:
-
-```text
-Cliente ──────┐
-              ├──> AssinaturaService
-Plano ────────┘
-```
-
----
-
-# 👤 Integrante 2 — Pagamentos e notificações
-
-## Responsabilidade
-
-Implementar toda a parte relacionada ao processamento de pagamentos e comunicação com o cliente.
-
-## Arquivos
-
-```text
-interfaces/
-└── MetodoPagamento.java
-
-implementations/pagamento/
-├── PixPagamento.java
-├── CartaoPagamento.java
-└── BoletoPagamento.java
-
-interfaces/
-└── Notificador.java
-
-implementations/notificacao/
-├── EmailNotificador.java
-└── WhatsAppNotificador.java
-
-service/
-└── PagamentoService.java
-```
-
-## Funções
-
-### MetodoPagamento
-
-```java
-pagar()
-getDescricao()
-```
-
-### PixPagamento
-
-```java
-pagar()
-getDescricao()
-```
-
-### CartaoPagamento
-
-```java
-pagar()
-getDescricao()
-```
-
-### BoletoPagamento
-
-```java
-pagar()
-getDescricao()
-```
-
-### Notificador
-
-```java
-enviar()
-```
-
-### EmailNotificador
-
-```java
-enviar()
-```
-
-### WhatsAppNotificador
-
-```java
-enviar()
-```
-
-### PagamentoService
-
-```java
-processarPagamento()
-```
-
-## Conexão
-
-O `PagamentoService` será utilizado pelo `AssinaturaService`.
-
-```text
-AssinaturaService
-       │
-       ▼
-PagamentoService
-       │
-       ├── MetodoPagamento
-       │       ├── Pix
-       │       ├── Cartão
-       │       └── Boleto
-       │
-       └── Notificador
-               ├── Email
-               └── WhatsApp
-```
-
-Essa área demonstra principalmente:
-
-```text
-OCP
-LSP
-DIP
-```
-
----
-
-# 👤 Integrante 3 — Descontos e gerenciamento de assinaturas
-
-## Responsabilidade
-
-Implementar as regras relacionadas a descontos e coordenar o ciclo de vida das assinaturas.
-
-## Arquivos
-
-```text
-interfaces/
-└── CalculadoraDesconto.java
-
-implementations/desconto/
-├── DescontoCupom.java
-└── DescontoClienteNovo.java
-
-service/
-└── AssinaturaService.java
-
-model/
-├── Pagamento.java
-└── Cupom.java
-```
-
-## Funções
-
-### Cupom.java
-
-```java
-getCodigo()
-getTipo()
-getPercentual()
-getValidade()
-```
-
-### Pagamento.java
-
-```java
-getId()
-getAssinatura()
-getMetodo()
-getValor()
-getStatus()
-getDataPagamento()
-```
-
-### CalculadoraDesconto
-
-```java
-calcularDesconto()
-```
-
-### DescontoCupom
-
-```java
-calcularDesconto()
-```
-
-### DescontoClienteNovo
-
-```java
-calcularDesconto()
-```
-
-### AssinaturaService
-
-```java
-criarAssinatura()
-renovarAssinatura()
-cancelarAssinatura()
-```
-
-## Conexão
-
-O `AssinaturaService` será o principal ponto de integração do projeto.
-
-```text
-Cliente
-   │
-   ▼
-AssinaturaService
-   │
-   ├── Plano
-   │
-   ├── CalculadoraDesconto
-   │
-   └── PagamentoService
-```
-
-Exemplo:
-
-```text
-Cliente escolhe plano
-        ↓
-AssinaturaService
-        ↓
-CalculadoraDesconto
-        ↓
-valor final
-        ↓
-PagamentoService
-        ↓
-pagamento aprovado
-        ↓
-Assinatura criada
-```
-
-Essa área demonstra principalmente:
-
-```text
-SRP
-OCP
-DIP
-```
-
----
-
-# 👤 Integrante 4 — Terminal e integração
-
-## Responsabilidade
-
-Criar a interface de terminal e integrar todas as partes desenvolvidas pelos outros integrantes.
-
-## Arquivo
-
-```text
-Main.java
-```
-
-## Funções principais
-
-```java
-main()
-exibirMenu()
-criarAssinatura()
-listarAssinaturas()
-renovarAssinatura()
-cancelarAssinatura()
-lerOpcao()
-```
-
-O `Main` deverá cuidar da interação com o usuário.
-
-Ele **não deve concentrar as regras de negócio**.
-
-O ideal é:
-
-```java
-assinaturaService.criarAssinatura(...);
-```
-
-e não:
-
-```java
-// Main calculando desconto
-// Main processando Pix
-// Main criando assinatura
-// Main enviando e-mail
-```
-
-## Conexão
-
-O Integrante 4 conecta todos os outros:
-
-```text
-                    ┌──> Cliente
-                    │
-                    ├──> Plano
-                    │
-Main ──> AssinaturaService
-                    │
-                    ├──> CalculadoraDesconto
-                    │
-                    └──> PagamentoService
-                              │
-                              ├──> MetodoPagamento
-                              └──> Notificador
-```
-
----
-
-# 🔗 Dependências entre os integrantes
-
-A integração pode seguir esta ordem:
-
-```text
-INTEGRANTE 1
-Modelos
-   │
-   ├──────────────┐
-   ▼              ▼
-INTEGRANTE 2   INTEGRANTE 3
-Pagamento      Assinaturas
-   │              │
-   └──────┬───────┘
-          ▼
-     INTEGRANTE 4
-         Main
-```
-
-Mais especificamente:
-
-```text
-Integrante 1
-    │
-    │ fornece Cliente, Plano e Assinatura
-    ▼
-Integrante 3
-    │
-    │ utiliza PagamentoService
-    ▼
-Integrante 2
-    │
-    │ utiliza interfaces de pagamento
-    ▼
-Implementações
-```
-
-E finalmente:
-
-```text
-Integrante 4
-     │
-     ▼
-AssinaturaService
-     │
-     ├── Cliente
-     ├── Plano
-     ├── CalculadoraDesconto
-     └── PagamentoService
-              │
-              ├── MetodoPagamento
-              └── Notificador
-```
-
----
-
-# 🧪 Cenários que deverão ser demonstrados
-
-O `Main.java` deverá permitir testar pelo menos dois fluxos diferentes.
-
-## Cenário 1 — Assinatura com Pix
-
-```text
-Cliente: João
-Plano: Premium
-Pagamento: Pix
-Notificação: WhatsApp
-Desconto: nenhum
-```
-
-Fluxo:
-
-```text
-João
- ↓
-Premium
- ↓
-Sem desconto
- ↓
-Pix
- ↓
-Pagamento aprovado
- ↓
-Assinatura criada
- ↓
-WhatsApp
-```
-
----
-
-## Cenário 2 — Assinatura com desconto
-
-```text
-Cliente: Maria
-Plano: Básico
-Pagamento: Cartão
-Notificação: E-mail
-Desconto: PRIMEIRA10
-```
-
-Fluxo:
-
-```text
-Maria
- ↓
-Básico
- ↓
-Cupom PRIMEIRA10
- ↓
-Valor com desconto
- ↓
-Cartão
- ↓
-Pagamento aprovado
- ↓
-Assinatura criada
- ↓
-E-mail
-```
-
----
-
-# 🚫 O que evitar
-
-O projeto não deverá utilizar estruturas como:
-
-```java
-if (tipoPagamento.equals("PIX")) {
-    // ...
-} else if (tipoPagamento.equals("CARTAO")) {
-    // ...
-}
-```
-
-para decidir qual comportamento executar.
-
-Também deve ser evitado:
-
-```java
-instanceof
-```
-
-para controlar regras de negócio.
-
-A ideia é utilizar **polimorfismo e interfaces**.
-
-Em vez de:
-
-```java
-if (tipo == PIX) {
-    // Pix
-}
-```
-
-utilizar:
-
-```java
-MetodoPagamento metodoPagamento;
-```
-
-e permitir que a implementação execute o comportamento correspondente.
-
----
-
-# 📌 Regras para integração da equipe
-
-1. Cada integrante deve trabalhar prioritariamente nos arquivos de sua responsabilidade.
-2. Interfaces devem ser definidas antes das implementações que dependem delas.
-3. Não alterar a assinatura de métodos públicos de outro integrante sem avisar a equipe.
-4. O `Main.java` deve utilizar os Services, e não implementar regras de negócio.
-5. Os Services devem depender de interfaces.
-6. Novos comportamentos devem preferencialmente ser adicionados criando novas implementações.
-7. Todos devem testar suas classes antes de integrar com o restante do projeto.
-
----
-
-# 🌿 Sugestão de branches
-
-Cada integrante pode trabalhar em uma branch própria:
-
-```text
-main
-│
-├── feature/modelos
-├── feature/pagamentos
-├── feature/assinaturas
-└── feature/main-integracao
-```
-
-Depois, as branches podem ser integradas na `main`.
-
----
-
-# 📝 Resumo da divisão
-
-| Integrante | Área                                     | Arquivos principais                                                         |
-| ---------- | ---------------------------------------- | --------------------------------------------------------------------------- |
-| 1          | Modelagem                                | `Cliente`, `Plano`, `Assinatura`                                            |
-| 2          | Pagamentos e notificações                | `MetodoPagamento`, `PagamentoService`, Pix, Cartão, Boleto, Email, WhatsApp |
-| 3          | Descontos e gerenciamento de assinaturas | `Cupom`, `Pagamento`, `CalculadoraDesconto`, `AssinaturaService`            |
-| 4          | Terminal e integração                    | `Main.java`                                                                 |
-
-A divisão foi pensada para que **ninguém trabalhe isoladamente**: o Integrante 1 fornece o domínio, o Integrante 2 fornece o processamento de pagamentos e notificações, o Integrante 3 coordena a assinatura e os descontos, e o Integrante 4 integra tudo através do terminal.
-
----
-
-# 🚀 Possíveis extensões futuras
-
-A arquitetura permite adicionar novos comportamentos sem alterar o núcleo do sistema.
-
-Por exemplo:
-
-```text
-Novos pagamentos:
-    CriptoPagamento
-    ApplePayPagamento
-
-Novos notificadores:
-    SMSNotificador
-    PushNotificador
-
-Novos descontos:
-    DescontoFidelidade
-    DescontoAniversario
-
-Novos planos:
-    Empresarial
-    Familiar
-    Estudante
-```
-
-A adição dessas funcionalidades deve ocorrer principalmente através de novas implementações das interfaces existentes.
-
----
-
-# 📚 Tecnologias
-
-* Java
-* IntelliJ IDEA
-* Programação Orientada a Objetos
-* Interfaces
-* Polimorfismo
-* Princípios SOLID
-* `Scanner` para interação via terminal
-
-Inicialmente, os dados podem ser mantidos **em memória**, utilizando estruturas como `List`/`ArrayList`, sem necessidade de banco de dados ou framework externo.
-
----
-
-# 👨‍💻 Equipe
-
-| Integrante   | Responsabilidade                         |
-| ------------ | ---------------------------------------- |
-| Integrante 1 | Modelagem do domínio                     |
-| Integrante 2 | Pagamentos e notificações                |
-| Integrante 3 | Descontos e gerenciamento de assinaturas |
-| Integrante 4 | Terminal e integração                    |
-
----
+##  Equipe
+
+| Integrante | Responsabilidade |
+| ---------- | ---------------- |
+| Matheus Bueno | Modelagem do domínio (`Cliente`, `Plano`, `Assinatura`) |
+| Gabriel Canoff| Pagamentos e notificações (`MetodoPagamento`, `Notificador`, implementações e `PagamentoService`) |
+| Pedro Basilio | Descontos e assinaturas (`Cupom`, `Pagamento`, `CalculadorDesconto`, `AssinaturaService`) |
+| Lucas Perusselli | Terminal e integração (`Main`) |

@@ -3,19 +3,21 @@ import submanager.model.Plano;
 import submanager.model.Assinatura;
 import submanager.model.Cupom;
 
-import submanager.interfaces.MetodoPagamento;
-import submanager.interfaces.Notificador;
-import submanager.interfaces.CalculadorDesconto;
+import submanager.builder.SolicitacaoAssinatura;
+import submanager.builder.SolicitacaoAssinaturaBuilder;
 
-import submanager.implementations.pagamento.PixPagamento;
-import submanager.implementations.pagamento.CartaoPagamento;
-import submanager.implementations.pagamento.BoletoPagamento;
-
-import submanager.implementations.notificacao.EmailNotificador;
-import submanager.implementations.notificacao.WhatsappNotificador;
-
-import submanager.implementations.desconto.DescontoCupom;
-import submanager.implementations.desconto.DescontoClienteNovo;
+import submanager.factory.RegistroDeCriadores;
+import submanager.factory.pagamento.MetodoPagamentoCreator;
+import submanager.factory.pagamento.PixCreator;
+import submanager.factory.pagamento.CartaoCreator;
+import submanager.factory.pagamento.BoletoCreator;
+import submanager.factory.notificacao.NotificadorCreator;
+import submanager.factory.notificacao.EmailCreator;
+import submanager.factory.notificacao.WhatsappCreator;
+import submanager.factory.desconto.DescontoCreator;
+import submanager.factory.desconto.DescontoClienteNovoCreator;
+import submanager.factory.desconto.DescontoCupomCreator;
+import submanager.factory.desconto.SemDescontoCreator;
 
 import submanager.service.AssinaturaService;
 import submanager.service.PagamentoService;
@@ -25,6 +27,7 @@ import java.util.Scanner;
 
 // Main: apenas interação com o usuário e montagem (composição) das dependências.
 // Nenhuma regra de negócio fica aqui: desconto, cobrança, ativação e notificação são dos Services.
+// Padrões usados aqui: Factory Method (via Creators registrados) e Builder (a Main é o Director).
 public class Main {
     private static final Scanner scanner = new Scanner(System.in);
 
@@ -32,6 +35,27 @@ public class Main {
     private static final String CODIGO_CUPOM_PROMO = "PROMO10";
     private static final double PERCENTUAL_CUPOM_PROMO = 10.0;
     private static final int VALIDADE_CUPOM_DIAS = 30;
+
+    // Opção do menu de desconto que exige um cupom
+    private static final int OPCAO_DESCONTO_CUPOM = 2;
+
+    // Opção do menu -> Creator (Factory Method). Substitui os antigos switch.
+    private static final RegistroDeCriadores<NotificadorCreator> NOTIFICADORES =
+            new RegistroDeCriadores<NotificadorCreator>("notificação")
+                    .registrar(1, new EmailCreator())
+                    .registrar(2, new WhatsappCreator());
+
+    private static final RegistroDeCriadores<DescontoCreator> DESCONTOS =
+            new RegistroDeCriadores<DescontoCreator>("desconto")
+                    .registrar(1, new DescontoClienteNovoCreator())
+                    .registrar(OPCAO_DESCONTO_CUPOM, new DescontoCupomCreator())
+                    .registrar(3, new SemDescontoCreator());
+
+    private static final RegistroDeCriadores<MetodoPagamentoCreator> PAGAMENTOS =
+            new RegistroDeCriadores<MetodoPagamentoCreator>("forma de pagamento")
+                    .registrar(1, new PixCreator())
+                    .registrar(2, new CartaoCreator())
+                    .registrar(3, new BoletoCreator());
 
     // Contador simples para IDs de cliente (em memória)
     private static int proximoIdCliente = 1;
@@ -85,43 +109,51 @@ public class Main {
             return;
         }
 
+        // Builder: a solicitação é montada passo a passo, na ordem do menu.
+        SolicitacaoAssinaturaBuilder builder = new SolicitacaoAssinaturaBuilder().comCliente(cliente);
+
         System.out.println("\n--- 2. ESCOLHA O PLANO ---");
         System.out.println("[1] Básico (R$ 29,90)\n[2] Premium (R$ 59,90)");
         System.out.print("Opção: ");
-        int opcaoPlano = lerOpcao();
-        Plano plano = selecionarPlano(opcaoPlano);
+        builder.comPlano(selecionarPlano(lerOpcao()));
 
         System.out.println("\n--- 3. MÉTODO DE NOTIFICAÇÃO ---");
         System.out.println("[1] Email\n[2] WhatsApp");
-        System.out.print("Opção: ");
-        int opcaoNotificacao = lerOpcao();
-        Notificador notificador = selecionarNotificador(opcaoNotificacao);
+        int opcaoNotificacao = lerOpcaoRegistrada(NOTIFICADORES);
+        builder.comNotificador(NOTIFICADORES.obter(opcaoNotificacao).obterNotificador());
 
         System.out.println("\n--- 4. TIPO DE DESCONTO ---");
         System.out.println("[1] Cliente Novo (15%)\n[2] Cupom Promocional (10%)\n[3] Nenhum");
-        System.out.print("Opção: ");
-        int opcaoDesconto = lerOpcao();
-        CalculadorDesconto calculadorDesconto = selecionarDesconto(opcaoDesconto);
-        Cupom cupomAplicado = (opcaoDesconto == 2) ? criarCupomPromocional() : null;
+        int opcaoDesconto = lerOpcaoRegistrada(DESCONTOS);
+        builder.comDesconto(DESCONTOS.obter(opcaoDesconto).obterCalculador());
+        if (opcaoDesconto == OPCAO_DESCONTO_CUPOM) {
+            builder.comCupom(criarCupomPromocional());
+        }
 
         System.out.println("\n--- 5. FORMA DE PAGAMENTO ---");
         System.out.println("[1] PIX\n[2] Cartão de Crédito\n[3] Boleto");
-        System.out.print("Opção: ");
-        int opcaoPagamento = lerOpcao();
-        MetodoPagamento metodoPagamento = selecionarMetodoPagamento(opcaoPagamento);
-
-        // Composição das dependências (DIP): os Services só conhecem as abstrações.
-        PagamentoService pagamentoService = new PagamentoService(metodoPagamento, notificador);
-        AssinaturaService assinaturaService = new AssinaturaService(pagamentoService, notificador, calculadorDesconto);
+        int opcaoPagamento = lerOpcaoRegistrada(PAGAMENTOS);
+        builder.comMetodoPagamento(PAGAMENTOS.obter(opcaoPagamento).obterMetodo());
 
         System.out.println("\n========================================");
         System.out.println("          RESUMO DA ASSINATURA          ");
         System.out.println("========================================");
-        System.out.println("Processando assinatura e pagamento...\n");
 
         try {
+            // build() valida todos os passos de uma vez.
+            SolicitacaoAssinatura solicitacao = builder.build();
+            System.out.println(solicitacao);
+            System.out.println("\nProcessando assinatura e pagamento...\n");
+
+            // Composição das dependências (DIP): os Services só conhecem as abstrações.
+            PagamentoService pagamentoService =
+                    new PagamentoService(solicitacao.getMetodoPagamento(), solicitacao.getNotificador());
+            AssinaturaService assinaturaService =
+                    new AssinaturaService(pagamentoService, solicitacao.getNotificador(), solicitacao.getCalculadorDesconto());
+
             // O service aplica o desconto, cobra, ativa a assinatura e notifica o cliente.
-            Assinatura assinatura = assinaturaService.criarAssinatura(cliente, plano, cupomAplicado);
+            Assinatura assinatura = assinaturaService.criarAssinatura(
+                    solicitacao.getCliente(), solicitacao.getPlano(), solicitacao.getCupom());
 
             if (assinatura.getStatus() == Assinatura.Status.ATIVA) {
                 System.out.println("\n[SUCESSO] Sua assinatura foi ativada com sucesso!");
@@ -145,21 +177,6 @@ public class Main {
         };
     }
 
-    private static Notificador selecionarNotificador(int opcao) {
-        return switch (opcao) {
-            case 2 -> new WhatsappNotificador();
-            default -> new EmailNotificador();
-        };
-    }
-
-    private static CalculadorDesconto selecionarDesconto(int opcao) {
-        return switch (opcao) {
-            case 1 -> new DescontoClienteNovo();
-            case 2 -> new DescontoCupom();
-            default -> (valor, cupom) -> 0.0; // Sem desconto: o calculador devolve o VALOR DO DESCONTO (zero)
-        };
-    }
-
     private static Cupom criarCupomPromocional() {
         return new Cupom(
                 CODIGO_CUPOM_PROMO,
@@ -168,12 +185,16 @@ public class Main {
                 LocalDate.now().plusDays(VALIDADE_CUPOM_DIAS));
     }
 
-    private static MetodoPagamento selecionarMetodoPagamento(int opcao) {
-        return switch (opcao) {
-            case 2 -> new CartaoPagamento();
-            case 3 -> new BoletoPagamento();
-            default -> new PixPagamento();
-        };
+    // Repete a pergunta até o usuário digitar uma opção registrada.
+    private static int lerOpcaoRegistrada(RegistroDeCriadores<?> registro) {
+        while (true) {
+            System.out.print("Opção: ");
+            int opcao = lerOpcao();
+            if (registro.contem(opcao)) {
+                return opcao;
+            }
+            System.out.println("[!] Opção inválida. Tente novamente.");
+        }
     }
 
     private static int lerOpcao() {

@@ -11,23 +11,28 @@ import submanager.factory.pagamento.MetodoPagamentoCreator;
 import submanager.factory.pagamento.PixCreator;
 import submanager.factory.pagamento.CartaoCreator;
 import submanager.factory.pagamento.BoletoCreator;
+import submanager.factory.pagamento.GatewayExternoCreator;
 import submanager.factory.notificacao.NotificadorCreator;
 import submanager.factory.notificacao.EmailCreator;
 import submanager.factory.notificacao.WhatsappCreator;
+import submanager.factory.notificacao.EmailEWhatsappCreator;
 import submanager.factory.desconto.DescontoCreator;
 import submanager.factory.desconto.DescontoClienteNovoCreator;
 import submanager.factory.desconto.DescontoCupomCreator;
 import submanager.factory.desconto.SemDescontoCreator;
+import submanager.factory.desconto.ClienteNovoECupomCreator;
 
 import submanager.service.AssinaturaService;
 import submanager.service.PagamentoService;
 
 import java.time.LocalDate;
 import java.util.Scanner;
+import java.util.Set;
 
 // Main: apenas interação com o usuário e montagem (composição) das dependências.
 // Nenhuma regra de negócio fica aqui: desconto, cobrança, ativação e notificação são dos Services.
 // Padrões usados aqui: Factory Method (via Creators registrados) e Builder (a Main é o Director).
+// Adapter e Composite entram como opções do menu, criadas pelos próprios Creators.
 public class Main {
     private static final Scanner scanner = new Scanner(System.in);
 
@@ -36,26 +41,32 @@ public class Main {
     private static final double PERCENTUAL_CUPOM_PROMO = 10.0;
     private static final int VALIDADE_CUPOM_DIAS = 30;
 
-    // Opção do menu de desconto que exige um cupom
+    // Opções do menu de desconto que exigem um cupom (cupom sozinho e cliente novo + cupom)
     private static final int OPCAO_DESCONTO_CUPOM = 2;
+    private static final int OPCAO_DESCONTO_CLIENTE_NOVO_E_CUPOM = 4;
+    private static final Set<Integer> OPCOES_DESCONTO_COM_CUPOM =
+            Set.of(OPCAO_DESCONTO_CUPOM, OPCAO_DESCONTO_CLIENTE_NOVO_E_CUPOM);
 
     // Opção do menu -> Creator (Factory Method). Substitui os antigos switch.
     private static final RegistroDeCriadores<NotificadorCreator> NOTIFICADORES =
             new RegistroDeCriadores<NotificadorCreator>("notificação")
                     .registrar(1, new EmailCreator())
-                    .registrar(2, new WhatsappCreator());
+                    .registrar(2, new WhatsappCreator())
+                    .registrar(3, new EmailEWhatsappCreator()); // Composite
 
     private static final RegistroDeCriadores<DescontoCreator> DESCONTOS =
             new RegistroDeCriadores<DescontoCreator>("desconto")
                     .registrar(1, new DescontoClienteNovoCreator())
                     .registrar(OPCAO_DESCONTO_CUPOM, new DescontoCupomCreator())
-                    .registrar(3, new SemDescontoCreator());
+                    .registrar(3, new SemDescontoCreator())
+                    .registrar(OPCAO_DESCONTO_CLIENTE_NOVO_E_CUPOM, new ClienteNovoECupomCreator()); // Composite
 
     private static final RegistroDeCriadores<MetodoPagamentoCreator> PAGAMENTOS =
             new RegistroDeCriadores<MetodoPagamentoCreator>("forma de pagamento")
                     .registrar(1, new PixCreator())
                     .registrar(2, new CartaoCreator())
-                    .registrar(3, new BoletoCreator());
+                    .registrar(3, new BoletoCreator())
+                    .registrar(4, new GatewayExternoCreator()); // Adapter
 
     // Contador simples para IDs de cliente (em memória)
     private static int proximoIdCliente = 1;
@@ -118,20 +129,20 @@ public class Main {
         builder.comPlano(selecionarPlano(lerOpcao()));
 
         System.out.println("\n--- 3. MÉTODO DE NOTIFICAÇÃO ---");
-        System.out.println("[1] Email\n[2] WhatsApp");
+        System.out.println("[1] Email\n[2] WhatsApp\n[3] Email + WhatsApp (ambos)");
         int opcaoNotificacao = lerOpcaoRegistrada(NOTIFICADORES);
         builder.comNotificador(NOTIFICADORES.obter(opcaoNotificacao).obterNotificador());
 
         System.out.println("\n--- 4. TIPO DE DESCONTO ---");
-        System.out.println("[1] Cliente Novo (15%)\n[2] Cupom Promocional (10%)\n[3] Nenhum");
+        System.out.println("[1] Cliente Novo (15%)\n[2] Cupom Promocional (10%)\n[3] Nenhum\n[4] Cliente Novo + Cupom (cumulativo)");
         int opcaoDesconto = lerOpcaoRegistrada(DESCONTOS);
         builder.comDesconto(DESCONTOS.obter(opcaoDesconto).obterCalculador());
-        if (opcaoDesconto == OPCAO_DESCONTO_CUPOM) {
+        if (OPCOES_DESCONTO_COM_CUPOM.contains(opcaoDesconto)) {
             builder.comCupom(criarCupomPromocional());
         }
 
         System.out.println("\n--- 5. FORMA DE PAGAMENTO ---");
-        System.out.println("[1] PIX\n[2] Cartão de Crédito\n[3] Boleto");
+        System.out.println("[1] PIX\n[2] Cartão de Crédito\n[3] Boleto\n[4] Gateway Externo (PayFlow)");
         int opcaoPagamento = lerOpcaoRegistrada(PAGAMENTOS);
         builder.comMetodoPagamento(PAGAMENTOS.obter(opcaoPagamento).obterMetodo());
 

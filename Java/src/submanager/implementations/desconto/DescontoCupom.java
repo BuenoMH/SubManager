@@ -4,6 +4,9 @@ import submanager.interfaces.CalculadorDesconto;
 import submanager.model.Cupom;
 
 // Desconto baseado em cupom. Sem cupom (null) ou cupom vencido = desconto zero.
+/**
+ * @note Papel no Padrão: Concrete Product (Factory Method); Leaf (Composite - DescontoComposto)
+ */
 public class DescontoCupom implements CalculadorDesconto {
 
     @Override

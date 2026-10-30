@@ -1,3 +1,4 @@
+
 package submanager.service;
 
 import submanager.interfaces.CalculadorDesconto;
@@ -56,20 +57,25 @@ public class AssinaturaService {
         return criarAssinatura(cliente, plano, null);
     }
 
-    // Renova por mais um período. Retorna false se o pagamento foi recusado.
+    // Renova por mais um período, aplicando o desconto da estratégia ATUAL.
+    // Retorna false se o pagamento foi recusado.
     // Valida ANTES de cobrar: uma assinatura cancelada/pendente nunca gera cobrança.
-    public boolean renovarAssinatura(Assinatura assinatura) {
+    public boolean renovarAssinatura(Assinatura assinatura, Cupom cupom) {
         assinatura.validarRenovacao();
 
-        Pagamento pagamento = pagamentoService.processarPagamento(assinatura, assinatura.getPlano().getValor());
+        double valorOriginal = assinatura.getPlano().getValor();
+        double valorFinal = valorOriginal - calculadoraDesconto.calcularDesconto(valorOriginal, cupom);
+
+        Pagamento pagamento = pagamentoService.processarPagamento(assinatura, valorFinal);
         if (!pagamento.isAprovado()) {
             return false;
         }
 
         assinatura.renovar();
         notificador.enviar(
-                String.format("Olá %s! Sua assinatura do plano %s foi renovada. Novo vencimento: %s",
-                        assinatura.getCliente().getNome(), assinatura.getPlano().getNome(), assinatura.getDataFinal()),
+                String.format("Olá %s! Sua assinatura do plano %s foi renovada (R$ %.2f). Novo vencimento: %s",
+                        assinatura.getCliente().getNome(), assinatura.getPlano().getNome(),
+                        valorFinal, assinatura.getDataFinal()),
                 assinatura.getCliente());
 
         return true;
@@ -79,6 +85,15 @@ public class AssinaturaService {
         assinatura.cancelar();
         notificador.enviar(
                 String.format("Olá %s. Sua assinatura do plano %s foi cancelada. Esperamos vê-lo de volta em breve!",
+                        assinatura.getCliente().getNome(), assinatura.getPlano().getNome()),
+                assinatura.getCliente());
+    }
+
+    // ATIVA -> EXPIRADA (fim do período) e avisa o cliente.
+    public void expirarAssinatura(Assinatura assinatura) {
+        assinatura.expirar();
+        notificador.enviar(
+                String.format("Olá %s. Sua assinatura do plano %s expirou. Renove para continuar com acesso.",
                         assinatura.getCliente().getNome(), assinatura.getPlano().getNome()),
                 assinatura.getCliente());
     }

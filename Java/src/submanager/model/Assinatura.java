@@ -7,13 +7,11 @@ import submanager.state.PendenteState;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
-/**
+/*
  * Representa a contratação de um plano por um cliente.
  * O ciclo de vida (PENDENTE, ATIVA, CANCELADA, EXPIRADA) é delegado ao
  * {@link EstadoAssinatura} atual: esta classe não tem nenhum "if" de status.
  * NÃO processa pagamento nem envia notificação: isso é papel dos Services.
- *
- * @note Papel no Padrão: Context (State)
  */
 public class Assinatura {
 
@@ -73,6 +71,13 @@ public class Assinatura {
     public void renovar() {
         verificarExpiracao();
         estado.renovar(this);
+    }
+
+    // Efetiva um pagamento confirmado: PENDENTE -> ATIVA; ATIVA/EXPIRADA -> renovada.
+    // CANCELADA: não permitido (lança exceção, sem alterar nada).
+    public void efetivarPagamento() {
+        verificarExpiracao();
+        estado.efetivarPagamento(this);
     }
 
     // Lança exceção se a assinatura não puder ser renovada (PENDENTE ou CANCELADA).

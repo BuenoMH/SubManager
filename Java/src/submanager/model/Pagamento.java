@@ -18,9 +18,11 @@ public class Pagamento {
     private final int id;
     private final Assinatura assinatura;
     private final MetodoPagamento metodo;
+    private final String descricaoMetodo;
     private final double valor;
     private Status status;
     private LocalDateTime dataPagamento; // só é preenchida quando o pagamento é aprovado
+
 
     //pagamento ja nasce pendente
 
@@ -38,6 +40,7 @@ public class Pagamento {
         this.id = id;
         this.assinatura = assinatura;
         this.metodo = metodo;
+        this.descricaoMetodo = metodo.getDescricao();
         this.valor = valor;
         this.status = Status.PENDENTE;
         this.dataPagamento = null;
@@ -45,18 +48,19 @@ public class Pagamento {
 
     // PENDENTE -> APROVADO. Registra data e hora do pagamento.
     public void aprovar() {
-        exigirPendente();
+        validarPendente();
         status = Status.APROVADO;
         dataPagamento = LocalDateTime.now();
     }
 
     // PENDENTE -> RECUSADO.
     public void recusar() {
-        exigirPendente();
+        validarPendente();
         status = Status.RECUSADO;
     }
 
-    private void exigirPendente() {
+    // Lança exceção se o pagamento já foi finalizado (APROVADO ou RECUSADO).
+    public void validarPendente() {
         if (status != Status.PENDENTE) {
             throw new IllegalStateException(
                     "O pagamento já foi finalizado (status atual: " + status + ").");
@@ -71,8 +75,8 @@ public class Pagamento {
         return assinatura;
     }
 
-    public MetodoPagamento getMetodo() {
-        return metodo;
+    public String getDescricaoMetodo() {
+        return descricaoMetodo;
     }
 
     public double getValor() {
@@ -87,6 +91,10 @@ public class Pagamento {
         return status == Status.APROVADO;
     }
 
+    public boolean isPendente() {
+        return status == Status.PENDENTE;
+    }
+
     // Retorna null enquanto o pagamento não for aprovado.
     public LocalDateTime getDataPagamento() {
         return dataPagamento;
@@ -94,7 +102,7 @@ public class Pagamento {
 
     @Override
     public String toString() {
-        return String.format("Pagamento #%d | Assinatura #%d | R$ %.2f | %s",
-                id, assinatura.getId(), valor, status);
+        return String.format("Pagamento #%d | Assinatura #%d | R$ %.2f | %s | %s",
+                id, assinatura.getId(), valor, descricaoMetodo, status);
     }
 }

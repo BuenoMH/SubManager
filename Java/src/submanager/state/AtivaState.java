@@ -5,11 +5,9 @@ import submanager.model.Assinatura;
 
 import java.time.LocalDate;
 
-/**
+/*
  * Assinatura paga e em vigor. Pode ser renovada (o período é prolongado),
  * cancelada ou expirada (manualmente ou quando a data final passa).
- *
- * @note Papel no Padrão: Concrete State
  */
 public class AtivaState implements EstadoAssinatura {
 
@@ -21,6 +19,11 @@ public class AtivaState implements EstadoAssinatura {
     @Override
     public void renovar(Assinatura assinatura) {
         assinatura.prolongarPeriodo(); // o novo período começa ao fim do atual
+    }
+
+    @Override
+    public void efetivarPagamento(Assinatura assinatura) {
+        renovar(assinatura); // pagamento de renovação confirmado
     }
 
     @Override

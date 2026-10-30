@@ -1,12 +1,10 @@
 package submanager.external;
 
-/**
+/*
  * Gateway de pagamento de terceiros (simulado). Simula uma biblioteca externa
  * que o SubManager não controla: valores em CENTAVOS (long), moeda informada
  * como texto, resposta por código numérico e nenhuma relação com a interface
  * {@code MetodoPagamento} do sistema.
- *
- * @note Papel no Padrão: Adaptee (Adapter)
  */
 public class PayFlowGateway {
 

@@ -6,14 +6,12 @@ import submanager.interfaces.MetodoPagamento;
 
 import java.util.Objects;
 
-/**
- * Adapta a API do gateway externo PayFlow ao contrato {@link MetodoPagamento}.
- * Traduz o que o sistema entende (valor em reais, retorno boolean) para o que o
- * gateway exige (centavos, moeda em texto, código de resposta). Os Services
- * continuam enxergando apenas um MetodoPagamento comum.
- *
- * @note Papel no Padrão: Adapter (Object Adapter, por composição).
- *       Target = MetodoPagamento; Adaptee = PayFlowGateway.
+/*
+   Adapta a API do gateway externo PayFlow ao contrato {@link MetodoPagamento}.
+   Traduz o que o sistema entende (valor em reais, retorno boolean) para o que o
+   gateway exige (centavos, moeda em texto, código de resposta). Os Services
+   continuam enxergando apenas um MetodoPagamento comum.
+   Target = MetodoPagamento; Adaptee = PayFlowGateway.
  */
 public class PayFlowGatewayAdapter implements MetodoPagamento {
 
@@ -38,7 +36,7 @@ public class PayFlowGatewayAdapter implements MetodoPagamento {
         PayFlowResposta resposta = gateway.enviarCobranca(contaOrigem, centavos, MOEDA);
         System.out.println("[ADAPTER] resposta " + resposta.getCodigo()
                 + " (protocolo " + resposta.getProtocolo() + ") traduzida para "
-                + (resposta.getCodigo() == PayFlowGateway.CODIGO_APROVADO ? "aprovado" : "recusado"));
+                + (resposta.getCodigo() == PayFlowGateway.CODIGO_APROVADO ? "cobrança aceita" : "cobrança recusada"));
         return resposta.getCodigo() == PayFlowGateway.CODIGO_APROVADO;
     }
 

@@ -4,12 +4,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
+/*
  * Associa a opção numérica do menu ao Creator correspondente.
  * É o que substitui os "switch" da Main: para suportar uma nova opção basta
  * registrar um novo Creator (OCP), sem alterar nenhum código existente.
- *
- * @param <C> tipo do Creator guardado (MetodoPagamentoCreator, NotificadorCreator...)
  */
 public class RegistroDeCriadores<C> {
 

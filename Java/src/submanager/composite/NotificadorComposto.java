@@ -7,13 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/**
+/*
  * Agrupa vários canais de notificação e os trata como um único {@link Notificador}.
  * Os Services chamam enviar() uma vez e a mensagem sai por todos os canais.
  * Como também é um Notificador, pode conter outros compostos.
- *
- * @note Papel no Padrão: Composite. Component = Notificador;
- *       Leaf = EmailNotificador / WhatsappNotificador.
  */
 public class NotificadorComposto implements Notificador {
 

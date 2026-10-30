@@ -3,10 +3,8 @@ package submanager.state;
 
 import submanager.model.Assinatura;
 
-/**
+/*
  * Estado final: nenhuma operação é permitida, e cancelar de novo é erro.
- *
- * @note Papel no Padrão: Concrete State
  */
 public class CanceladaState implements EstadoAssinatura {
 

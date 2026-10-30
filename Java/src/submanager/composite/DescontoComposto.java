@@ -7,14 +7,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/**
+/*
  * Agrupa vários descontos e os trata como um único {@link CalculadorDesconto}.
  * Os descontos são aplicados em cascata: cada filho calcula sobre o que restou
  * depois dos anteriores, então a soma nunca passa do valor original.
- *
- * @note Papel no Padrão: Composite. Component = CalculadorDesconto;
- *       Leaf = DescontoClienteNovo / DescontoCupom / SemDesconto.
- */
+ * */
 public class DescontoComposto implements CalculadorDesconto {
 
     private final List<CalculadorDesconto> descontos = new ArrayList<>();

@@ -4,9 +4,7 @@ import submanager.interfaces.CalculadorDesconto;
 import submanager.model.Cupom;
 
 // Desconto fixo de 15% para cliente novo. Não depende de cupom (parâmetro ignorado).
-/**
- * @note Papel no Padrão: Concrete Product (Factory Method); Leaf (Composite - DescontoComposto)
- */
+
 public class DescontoClienteNovo implements CalculadorDesconto {
 
     private static final double PERCENTUAL_CLIENTE_NOVO = 15.0;

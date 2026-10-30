@@ -1,19 +1,16 @@
-
 package submanager.state;
 
 import submanager.model.Assinatura;
 
-/**
- * Contrato de um estado do ciclo de vida da assinatura. Cada operação recebe a
- * assinatura (o contexto) para poder executar a transição. Por padrão toda
- * operação é INVÁLIDA e lança exceção; cada estado concreto sobrescreve apenas
- * o que é permitido nele. Assim a Assinatura não precisa de nenhum "if" de status.
- *
- * @note Papel no Padrão: State (interface)
+/*
+  Contrato de um estado do ciclo de vida da assinatura. Cada operação recebe a
+  assinatura (o contexto) para poder executar a transição. Por padrão toda
+  operação é INVÁLIDA e lança exceção; cada estado concreto sobrescreve apenas
+  o que é permitido nele. Assim a Assinatura não precisa de nenhum "if" de status.
  */
 public interface EstadoAssinatura {
 
-    /** Status exposto para o restante do sistema (mantém o enum Assinatura.Status). */
+    /* Status exposto para o restante do sistema (mantém o enum Assinatura.Status). */
     Assinatura.Status getStatus();
 
     default void ativar(Assinatura assinatura) {
@@ -35,12 +32,21 @@ public interface EstadoAssinatura {
                 "Só é possível expirar uma assinatura ATIVA (status atual: " + getStatus() + ").");
     }
 
-    /** Lança exceção se o estado não permitir renovação. Usado antes de cobrar o cliente. */
+    /*
+      Efetiva um pagamento já confirmado: cada estado sabe o que isso significa para ele
+     (ativar a assinatura PENDENTE, renovar a ATIVA ou a EXPIRADA). Por padrão não é permitido.
+     */
+    default void efetivarPagamento(Assinatura assinatura) {
+        throw new IllegalStateException(
+                "Não é possível efetivar o pagamento de uma assinatura " + getStatus() + ".");
+    }
+
+    /* Lança exceção se o estado não permitir renovação. Usado antes de cobrar o cliente. */
     default void validarRenovacao() {
         throw renovacaoNegada();
     }
 
-    /** Estados que podem expirar por data sobrescrevem este método. */
+    /* Estados que podem expirar por data sobrescrevem este método. */
     default void verificarExpiracao(Assinatura assinatura) {
         // por padrão não faz nada
     }

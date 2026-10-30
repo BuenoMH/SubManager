@@ -7,13 +7,11 @@ import submanager.model.Cliente;
 import submanager.model.Cupom;
 import submanager.model.Plano;
 
-/**
+/*
  * Solicitação de assinatura já validada: tudo o que o menu coletou do usuário.
  * Imutável e com construtor restrito ao pacote: só o {@link SolicitacaoAssinaturaBuilder}
  * consegue criá-la, então toda instância existente é válida.
- *
- * @note Papel no Padrão: Product (Builder)
- */
+*/
 public final class SolicitacaoAssinatura {
 
     private final Cliente cliente;

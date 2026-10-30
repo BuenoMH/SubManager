@@ -1,11 +1,20 @@
+
 package submanager.model;
+
+import submanager.state.EstadoAssinatura;
+import submanager.state.PendenteState;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
-//  Representa a contratação de um plano por um cliente.
-// Controla o próprio ciclo de vida (ativar, renovar, cancelar), mas NÃO processa pagamento nem envia notificação: isso é papel dos Services.
-
+/**
+ * Representa a contratação de um plano por um cliente.
+ * O ciclo de vida (PENDENTE, ATIVA, CANCELADA, EXPIRADA) é delegado ao
+ * {@link EstadoAssinatura} atual: esta classe não tem nenhum "if" de status.
+ * NÃO processa pagamento nem envia notificação: isso é papel dos Services.
+ *
+ * @note Papel no Padrão: Context (State)
+ */
 public class Assinatura {
 
     public enum Status {
@@ -22,7 +31,7 @@ public class Assinatura {
     private final Plano plano;
     private LocalDate dataInicio;
     private LocalDate dataFinal;
-    private Status status;
+    private EstadoAssinatura estado;
 
     // Toda assinatura nasce PENDENTE, até o pagamento ser aprovado e ela ser ativada.
     public Assinatura(int id, Cliente cliente, Plano plano) {
@@ -38,62 +47,64 @@ public class Assinatura {
         this.plano = plano;
         this.dataInicio = LocalDate.now();
         this.dataFinal = dataInicio.plusMonths(plano.getPeriodo());
-        this.status = Status.PENDENTE;
+        this.estado = new PendenteState();
     }
 
-    // Ciclo de vida
+    // Ciclo de vida: cada operação é delegada ao estado atual
 
-    // PENDENTE -> ATIVA. Reinicia o período a partir de hoje
+    // PENDENTE -> ATIVA. Reinicia o período a partir de hoje.
     public void ativar() {
-        if (status != Status.PENDENTE) {
-            throw new IllegalStateException(
-                    "Só é possível ativar uma assinatura PENDENTE (status atual: " + status + ").");
-        }
-        dataInicio = LocalDate.now();
-        dataFinal = dataInicio.plusMonths(plano.getPeriodo());
-        status = Status.ATIVA;
+        estado.ativar(this);
     }
 
-    // Cancela a assinatura (qualquer status, exceto se já estiver cancelada).
+    // Cancela a assinatura (qualquer estado, exceto se já estiver cancelada).
     public void cancelar() {
-        if (status == Status.CANCELADA) {
-            throw new IllegalStateException("A assinatura já está cancelada.");
-        }
-        status = Status.CANCELADA;
+        estado.cancelar(this);
     }
 
-    // Renova a assinatura por mais um período do plano.
-    // ATIVA: o novo período começa ao fim do atual.
-    // EXPIRADA: o novo período começa hoje.
-    // PENDENTE ou CANCELADA: não pode ser renovada.
+    // ATIVA -> EXPIRADA. Usada quando o período termina (ou para simular o fim do período).
+    public void expirar() {
+        estado.expirar(this);
+    }
 
+    // Renova por mais um período do plano.
+    // ATIVA: o novo período começa ao fim do atual. EXPIRADA: começa hoje.
+    // PENDENTE ou CANCELADA: não pode ser renovada.
     public void renovar() {
         verificarExpiracao();
-        validarRenovacao();
-
-        if (status == Status.EXPIRADA) {
-            dataInicio = LocalDate.now();
-            dataFinal = dataInicio.plusMonths(plano.getPeriodo());
-        } else {
-            dataFinal = dataFinal.plusMonths(plano.getPeriodo());
-        }
-        status = Status.ATIVA;
+        estado.renovar(this);
     }
 
     // Lança exceção se a assinatura não puder ser renovada (PENDENTE ou CANCELADA).
     // Público para que o AssinaturaService valide ANTES de cobrar o cliente.
     public void validarRenovacao() {
-        if (status == Status.PENDENTE || status == Status.CANCELADA) {
-            throw new IllegalStateException(
-                    "Não é possível renovar uma assinatura " + status + ".");
-        }
+        estado.validarRenovacao();
     }
 
-    // Se estiver ATIVA e a data final já passou, marca como EXPIRADA.
+    // Se estiver ATIVA e a data final já passou, passa para EXPIRADA.
     public void verificarExpiracao() {
-        if (status == Status.ATIVA && LocalDate.now().isAfter(dataFinal)) {
-            status = Status.EXPIRADA;
+        estado.verificarExpiracao(this);
+    }
+
+    // Operações usadas pelos estados concretos (submanager.state) para executar as transições.
+    // Não fazem parte da API do restante do sistema: quem muda o status é sempre uma operação do ciclo de vida.
+
+    public void mudarEstado(EstadoAssinatura novoEstado) {
+        if (novoEstado == null) {
+            throw new IllegalArgumentException("O novo estado é obrigatório.");
         }
+        System.out.println("[STATE] Assinatura #" + id + ": "
+                + estado.getStatus() + " -> " + novoEstado.getStatus());
+        this.estado = novoEstado;
+    }
+
+    public void reiniciarPeriodo() {
+        dataInicio = LocalDate.now();
+        dataFinal = dataInicio.plusMonths(plano.getPeriodo());
+    }
+
+    public void prolongarPeriodo() {
+        dataFinal = dataFinal.plusMonths(plano.getPeriodo());
     }
 
     // Getters
@@ -119,13 +130,13 @@ public class Assinatura {
     }
 
     public Status getStatus() {
-        return status;
+        return estado.getStatus();
     }
 
     @Override
     public String toString() {
         return String.format("Assinatura #%d | %s | Plano %s | %s a %s | %s",
                 id, cliente.getNome(), plano.getNome(),
-                dataInicio.format(FORMATO), dataFinal.format(FORMATO), status);
+                dataInicio.format(FORMATO), dataFinal.format(FORMATO), getStatus());
     }
 }
